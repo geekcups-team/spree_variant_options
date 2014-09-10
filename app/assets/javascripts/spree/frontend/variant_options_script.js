@@ -44,54 +44,33 @@ function VariantOptions(params) {
 
 
   function init() {
-    divs = $('#product-variants .variant-options');
-    disable(divs.find('a.option-value').addClass('locked'));
-    update();
-    enable(parent.find('a.option-value'));
-    toggle();
-    $('div.variant-options a.clear-button').hide().click(handle_clear);
-
-    if (default_instock) {
-      divs.each(function(){
-        $(this).find("ul.variant-option-values li a.in-stock:first").click();
-      });
-    }
+    initSelect();
+    $('.select-option-type:eq(0)').trigger('change');
   }
-
-  function get_index(parent) {
-    return parseInt($(parent).attr('class').replace(/[^\d]/g, ''));
+  
+  function initSelect() {
+    $('#product-variants-select select').on('change',selectChange);
   }
+  
+  function selectChange(){
+    current_select = $(this);
+    next_index = $.inArray($(this).get(0),$('.select-option-type')) + 1;
+    next_select = $('.select-option-type').get(next_index);
+    
+    // if ($(this).parent('div').next('div').length > 0  && $(this).parent('div').next('div').attr('id').match(/\d+/)[0] != undefined) {
+    if (next_select) {
+      variant = null;
+      selection = [];
+      
+      // j = $(this).parent('div').next('div').attr('id').match(/\d+/)[0];
+      
 
-  function update(i) {
-    index = isNaN(i) ? index : i;
-    parent = $(divs.get(index));
-    buttons = parent.find('a.option-value');
-    parent.find('a.clear-button').hide();
-  }
-
-  function disable(btns) {
-    return btns.removeClass('selected');
-  }
-
-  function enable(btns) {
-    bt = btns.not('.unavailable').removeClass('locked').unbind('click')
-    if (!allow_select_outofstock && !allow_backorders)
-      bt = bt.filter('.in-stock')
-    return bt.click(handle_click).filter('.auto-click').removeClass('auto-click').click();
-  }
-
-  function advance() {
-    index++
-    update();
-    inventory(buttons.removeClass('locked'));
-    enable(buttons);
-  }
-
-  function inventory(btns) {
-    var keys, variants, selected = {};
-    var sels = $.map(divs.find('a.selected'), function(i) { return i.rel });
-    $.each(sels, function(key, value) {
-      key = value.split('-');
+      rel = current_select.find(':selected').val();
+      // show_variant_images(rel.split('-')[0]);
+    
+      // Mi tiro su tutte le selection con il prezzo.
+      key = rel.split('-');
+      
       var v = options[key[0]][key[1]];
       keys = $.keys(v);
       var m = Array.find_matches(selection.concat(keys));
@@ -100,26 +79,59 @@ function VariantOptions(params) {
       } else if (m) {
         selection = m;
       }
-    });
-    btns.removeClass('in-stock out-of-stock unavailable').each(function(i, element) {
-      var variants = get_variant_objects(element.rel);
-      var keys = $.keys(variants);
-      if (keys.length == 0) {
-        disable($(element).addClass('unavailable locked').unbind('click'));
-      } else if (keys.length == 1) {
-        _var = variants[keys[0]];
-        $(element).addClass(_var.in_stock ? selection.length == 1 ? 'in-stock auto-click' : 'in-stock' : 'out-of-stock');
-      } else if (allow_backorders) {
-        $(element).addClass('in-stock');
-      } else {
-        var count = 0;
-        $.each(variants, function(key, value) {
-          count += value.in_stock ? 1 : 0
-        });
-        $(element).addClass(count > 0 ? 'in-stock' : 'out-of-stock');
-      }
-    });
+    
+      var variants = get_variant_objects(rel);
+    
+      // opts = $('#option_type_' + j).find('option')
+      opts = $(next_select).find('option')
+      // variants_array = new Array();
+      var first = true;
+      // Per ogni elemento disponibile come option value lo abilito e seleziono il primo
+      opts.each(function(i, element) {
+         v = get_variant_objects($(element).val());
+         variant_obj = variants[$.keys(v)[0]];
+         if(variants[$.keys(v)[0]] == undefined)
+         {
+           $(element).attr('disabled',true);
+         }else{
+           if (first) {
+               $(element).attr('selected','selected');
+               $('[itemprop="price"]').text(variants[$.keys(v)[0]].price);
+               show_variant_images(variants[$.keys(v)[0]].id);
+               first = false;
+           }
+           $(element).attr('disabled',false);
+           if (!variant_obj.in_stock) {
+             $(element).data('in-stock',false)
+           }else{
+             $(element).data('in-stock',true)
+           }
+         }
+       
+      });
+      
+      // Propago alla successiva option type
+      $(next_select).trigger('change');
+      // $('#add-to-cart-button').prop('disabled',true);
+    }else{
+      $('#add-to-cart-button').prop('disabled',false);
+      var current_variant = get_variant_objects(current_select.val())
+      current_variant = current_variant[$.keys(current_variant)[0]]
+      $('[itemprop="price"]').text(current_variant.price);
+      show_variant_images(current_variant.id);
+      $('[name*=products]').val(current_variant.id);
+      $('[name=variant_id]').val(current_variant.id);
+
+    }
+    
+    
   }
+
+  function get_index(parent) {
+    return parseInt($(parent).attr('class').replace(/[^\d]/g, ''));
+  }
+
+ 
 
   function get_variant_objects(rels) {
     var i, ids, obj, variants = {};
@@ -156,106 +168,7 @@ function VariantOptions(params) {
     return string ? parseFloat(string.replace(/[^\d\.]/g, '')) : 0;
   }
 
-  // Find matching variants for selected option value
-  // Set price or price range if matching variants have different prices.
-  function find_variant() {
-    var selected = divs.find('a.selected');
-    var variants = get_variant_objects(selected.get(0).rel);
-    if (selected.length == divs.length) {
-      return variant = variants[selection[0]];
-    } else {
-      var prices = [];
-      $.each(variants, function(key, value) { prices.push(value.price) });
-      prices = $.unique(prices).sort(function(a, b) {
-        return to_f(a) < to_f(b) ? -1 : 1;
-      });
-      if (prices.length == 1) {
-        $('#product-price .price').html('<span class="price assumed">' + prices[0] + '</span>');
-      } else {
-        $('#product-price .price').html('<span class="price from">' + prices[0] + '</span> - <span class="price to">' + prices[prices.length - 1] + '</span>');
-      }
-      return variants;
-    }
-  }
-
-  function toggle(variants) {
-    if (variant) {
-      $('#variant_id, form[data-form-type="variant"] input[name$="[variant_id]"]').val(variant.id);
-      $('#product-price .price').removeClass('unselected').text(variant.price);
-      if (variant.in_stock)
-        $('#cart-form button[type=submit]').attr('disabled', false).fadeTo(100, 1);
-      $('form[data-form-type="variant"] button[type=submit]').attr('disabled', false).fadeTo(100, 1);
-      try {
-        show_variant_images(variant.id);
-      } catch(error) {
-        // depends on modified version of product.js
-      }
-    } else {
-
-      if (variants) {
-        variants_ids = $.keys(variants);
-        show_variant_images(variants_ids);
-      }
-
-      $('#variant_id, form[data-form-type="variant"] input[name$="[variant_id]"]').val('');
-      $('#cart-form button[type=submit], form[data-form-type="variant"] button[type=submit]').attr('disabled', true).fadeTo(0, 0.5);
-      price = $('#product-price .price').addClass('unselected')
-      // Replace product price by "(select)" only when there are at least 1 variant not out-of-stock
-      variants = $("div.variant-options.index-0")
-      if (variants.find("a.option-value.out-of-stock").length != variants.find("a.option-value").length)
-        price.text(i18n.variant_options_select);
-    }
-  }
-
-  function clear(i) {
-    variant = null;
-    update(i);
-    enable(buttons.removeClass('selected'));
-    toggle();
-    parent.nextAll().each(function(index, element) {
-      disable($(element).find('a.option-value').show().removeClass('in-stock out-of-stock').addClass('locked').unbind('click'));
-      $(element).find('a.clear-button').hide();
-      $(element).find('h6 strong.selection').html('').removeClass('out-of-stock');
-    });
-    parent.find('strong.selection').html('').removeClass('out-of-stock');
-    show_all_variant_images();
-  }
-
-
-  function handle_clear(evt) {
-    evt.preventDefault();
-    clear(get_index(this));
-  }
-
-  function handle_click(evt) {
-    evt.preventDefault();
-    variant = null;
-    selection = [];
-    var a = $(this);
-    if (!parent.has(a).length) {
-      clear(divs.index(a.parents('.variant-options:first')));
-    }
-    disable(buttons);
-    var a = enable(a.addClass('selected'));
-    parent.find('a.clear-button').css('display', 'inline-block');
-    advance();
-    handle_selected();
-
-    variants = find_variant();
-    toggle(variants);
-  }
-
-  function handle_selected() {
-    var selected = divs.find('a.selected');
-    selected.each(function(){
-      $this = $(this)
-      var selection = $this.parents('.variant-options').find('h6 strong.selection')
-      selection.html($this.attr('title'));
-
-      if ($this.hasClass('out-of-stock'))
-        selection.addClass('out-of-stock').attr('title', i18n.out_of_stock);
-    });
-  };
+ 
   $(document).ready(init);
 
 };

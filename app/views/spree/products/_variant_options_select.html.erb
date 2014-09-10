@@ -1,0 +1,34 @@
+<% if @product.has_variants? %>
+  <div id="product-variants-select">
+    <% index = 0 %>
+    <% @product.grouped_option_values.each do |type, values| %>
+      <div id="<%= dom_id(type) %>" class="variant-options index-<%= index %>">
+        <h6 class="variant-option-type">
+          <%= label_tag 'option-value-name', Spree.t(:select_a, :index => index + 1, :name => type.presentation.downcase) %>
+          <strong class='selection'></strong>
+          <%= link_to "", "#clear", :class => "icon-remove clear-button clear-index-#{index}" %>
+        </h6>
+        
+        <%= select_tag type.presentation.to_sym, options_for_select(values.map{|v| [v.presentation,"#{type.id}-#{v.id}"]}), class: "select-option-type"%>
+      </div>
+      <% index += 1 %>
+    <% end %>
+    
+    <%= hidden_field_tag "products[#{@product.id}]", "", :id => "variant_id", :class => "hidden" %>
+    <%= hidden_field_tag :variant_id, "", :class => "hidden" %>
+    <script type="text/javascript">
+    //<![CDATA[
+      var variant_options = new VariantOptions({
+        options: <%== @product.variant_options_hash.to_json -%>,
+        track_inventory_levels: <%==  !!Spree::Config[:track_inventory_levels] -%>,
+        allow_select_outofstock: <%== !!SpreeVariantOptions::VariantConfig[:allow_select_outofstock] -%>,
+        default_instock: <%== !!SpreeVariantOptions::VariantConfig[:default_instock] -%>,
+        i18n: <%== {:out_of_stock => Spree.t(:out_of_stock), :variant_options_select => Spree.t(:variant_options_select) }.to_json -%>
+      });
+    //]]>
+    </script>
+  </div>
+<% end %>
+
+
+
