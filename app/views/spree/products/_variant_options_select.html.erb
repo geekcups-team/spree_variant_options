@@ -28,6 +28,9 @@
     //]]>
     </script>
   </div>
+  <% else %>
+    <%= hidden_field_tag "products[#{@product.id}]", @product.master.id, :id => "variant_id", :class => "hidden" %>
+    <%= hidden_field_tag :variant_id, @product.master.id, :class => "hidden" %>
 <% end %>
 
 
