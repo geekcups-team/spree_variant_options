@@ -151,7 +151,7 @@ function VariantOptions(params) {
             var j = ids.length;
             while (j--) {
               obj = opv[ids[j]];
-              if (obj && $.keys(obj).length && 0 <= selection.indexOf(obj.id.toString())) {
+              if (obj && $.keys(obj).length ) {
                 variants[obj.id] = obj;
               }
             }
